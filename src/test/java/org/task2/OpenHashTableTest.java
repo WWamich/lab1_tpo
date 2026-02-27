@@ -29,19 +29,15 @@ public class OpenHashTableTest {
 
     static Stream<Arguments> putCases() {
         return Stream.of(
-                // empty bucket
                 Arguments.of(new int[]{}, 5,
                         List.of("PUT_START", "CALC_HASH", "INSERT_NEW")),
 
-                // collision -> iterate chain -> insert
                 Arguments.of(new int[]{5}, 15,
                         List.of("PUT_START", "CALC_HASH", "ITERATE_CHAIN", "INSERT_NEW")),
 
-                // duplicate -> iterate chain -> found duplicate
                 Arguments.of(new int[]{25}, 25,
                         List.of("PUT_START", "CALC_HASH", "ITERATE_CHAIN", "FOUND_DUPLICATE")),
 
-                // negative key (equivalence class)
                 Arguments.of(new int[]{}, -15,
                         List.of("PUT_START", "CALC_HASH", "INSERT_NEW"))
         );
