@@ -2,9 +2,13 @@ package org.task2;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -17,6 +21,58 @@ public class OpenHashTableTest {
         hashTable = new OpenHashTable(10);
     }
 
+    private void seed(int... keys) {
+        for (int k : keys) {
+            hashTable.put(k);
+        }
+    }
+
+    static Stream<Arguments> putCases() {
+        return Stream.of(
+                // empty bucket
+                Arguments.of(new int[]{}, 5,
+                        List.of("PUT_START", "CALC_HASH", "INSERT_NEW")),
+
+                // collision -> iterate chain -> insert
+                Arguments.of(new int[]{5}, 15,
+                        List.of("PUT_START", "CALC_HASH", "ITERATE_CHAIN", "INSERT_NEW")),
+
+                // duplicate -> iterate chain -> found duplicate
+                Arguments.of(new int[]{25}, 25,
+                        List.of("PUT_START", "CALC_HASH", "ITERATE_CHAIN", "FOUND_DUPLICATE")),
+
+                // negative key (equivalence class)
+                Arguments.of(new int[]{}, -15,
+                        List.of("PUT_START", "CALC_HASH", "INSERT_NEW"))
+        );
+    }
+
+    @ParameterizedTest(name = "put key={1}, initial={0}")
+    @MethodSource("putCases")
+    void testPut_ExecutionPath(int[] initialKeys, int keyToPut, List<String> expectedTrace) {
+        seed(initialKeys);
+        hashTable.clearTrace();
+
+        hashTable.put(keyToPut);
+
+        assertEquals(expectedTrace, hashTable.getTrace());
+        assertTrue(hashTable.contains(keyToPut));
+    }
+
+    static Stream<Arguments> containsCases() {
+        return Stream.of(
+                Arguments.of(new int[]{13, 23, 33}, 13, true,
+                        List.of("SEARCH_START", "CALC_HASH",
+                                "ITERATE_CHAIN", "ITERATE_CHAIN", "ITERATE_CHAIN",
+                                "FOUND_TRUE")),
+
+                Arguments.of(new int[]{5, 15}, 25, false,
+                        List.of("SEARCH_START", "CALC_HASH",
+                                "ITERATE_CHAIN", "ITERATE_CHAIN",
+                                "FOUND_FALSE"))
+        );
+    }
+
     @Test
     public void testPut_EmptyBucket_ExecutionPath() {
         hashTable.clearTrace();
@@ -25,6 +81,18 @@ public class OpenHashTableTest {
         List<String> expectedTrace = Arrays.asList(
                 "PUT_START", "CALC_HASH", "INSERT_NEW"
         );
+        assertEquals(expectedTrace, hashTable.getTrace());
+    }
+
+    @ParameterizedTest(name = "contains key={1}, expected={2}, initial={0}")
+    @MethodSource("containsCases")
+    void testContains_ExecutionPath(int[] initialKeys, int searchKey, boolean expectedResult, List<String> expectedTrace) {
+        seed(initialKeys);
+        hashTable.clearTrace();
+
+        boolean result = hashTable.contains(searchKey);
+
+        assertEquals(expectedResult, result);
         assertEquals(expectedTrace, hashTable.getTrace());
     }
 
