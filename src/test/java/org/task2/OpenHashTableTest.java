@@ -1,231 +1,79 @@
 package org.task2;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class OpenHashTableTest {
 
-    private OpenHashTable hashTable;
+    private OpenHashTable<Integer, String> map;
 
     @BeforeEach
     public void setup() {
-        hashTable = new OpenHashTable(10);
+        map = new OpenHashTable<>(10);
+        map.clearTrace();
     }
 
-    private void seed(int... keys) {
-        for (int k : keys) {
-            hashTable.put(k);
+    private void seed(Integer[] keys, String[] values) {
+        for (int i = 0; i < keys.length; i++) {
+            map.put(keys[i], values[i]);
         }
+        map.clearTrace();
     }
 
-    static Stream<Arguments> putCases() {
+    static Stream<Arguments> putProvider() {
         return Stream.of(
-                Arguments.of(new int[]{}, 5,
-                        List.of("PUT_START", "CALC_HASH", "INSERT_NEW")),
-
-                Arguments.of(new int[]{5}, 15,
-                        List.of("PUT_START", "CALC_HASH", "ITERATE_CHAIN", "INSERT_NEW")),
-
-                Arguments.of(new int[]{25}, 25,
-                        List.of("PUT_START", "CALC_HASH", "ITERATE_CHAIN", "FOUND_DUPLICATE")),
-
-                Arguments.of(new int[]{}, -15,
-                        List.of("PUT_START", "CALC_HASH", "INSERT_NEW"))
+                Arguments.of(new Integer[]{}, new String[]{}, 10, "Val1", List.of("PUT_START", "CALC_HASH", "INSERT_NEW")),
+                Arguments.of(new Integer[]{10}, new String[]{"Val1"}, 10, "Val2", List.of("PUT_START", "CALC_HASH", "ITERATE_CHAIN", "REPLACE_VALUE")),
+                Arguments.of(new Integer[]{10}, new String[]{"Val1"}, 20, "Val2", List.of("PUT_START", "CALC_HASH", "ITERATE_CHAIN", "INSERT_NEW"))
         );
     }
 
-    @ParameterizedTest(name = "put key={1}, initial={0}")
-    @MethodSource("putCases")
-    void testPut_ExecutionPath(int[] initialKeys, int keyToPut, List<String> expectedTrace) {
-        seed(initialKeys);
-        hashTable.clearTrace();
-
-        hashTable.put(keyToPut);
-
-        assertEquals(expectedTrace, hashTable.getTrace());
-        assertTrue(hashTable.contains(keyToPut));
+    @ParameterizedTest
+    @MethodSource("putProvider")
+    void testPut(Integer[] initialKeys, String[] initialValues, Integer key, String value, List<String> expected) {
+        seed(initialKeys, initialValues);
+        map.put(key, value);
+        assertEquals(expected, map.getTrace());
     }
 
-    static Stream<Arguments> containsCases() {
+    static Stream<Arguments> getProvider() {
         return Stream.of(
-                Arguments.of(new int[]{13, 23, 33}, 13, true,
-                        List.of("SEARCH_START", "CALC_HASH",
-                                "ITERATE_CHAIN", "ITERATE_CHAIN", "ITERATE_CHAIN",
-                                "FOUND_TRUE")),
-
-                Arguments.of(new int[]{5, 15}, 25, false,
-                        List.of("SEARCH_START", "CALC_HASH",
-                                "ITERATE_CHAIN", "ITERATE_CHAIN",
-                                "FOUND_FALSE"))
+                Arguments.of(new Integer[]{10, 20, 30}, new String[]{"V1", "V2", "V3"}, 30, "V3", List.of("GET_START", "CALC_HASH", "ITERATE_CHAIN", "FOUND_KEY")),
+                Arguments.of(new Integer[]{10, 20, 30}, new String[]{"V1", "V2", "V3"}, 10, "V1", List.of("GET_START", "CALC_HASH", "ITERATE_CHAIN", "ITERATE_CHAIN", "ITERATE_CHAIN", "FOUND_KEY")),
+                Arguments.of(new Integer[]{10}, new String[]{"V1"}, 99, null, List.of("GET_START", "CALC_HASH", "NOT_FOUND"))
         );
     }
 
-    @Test
-    public void testPut_EmptyBucket_ExecutionPath() {
-        hashTable.clearTrace();
-        hashTable.put(5);
-
-        List<String> expectedTrace = Arrays.asList(
-                "PUT_START", "CALC_HASH", "INSERT_NEW"
-        );
-        assertEquals(expectedTrace, hashTable.getTrace());
+    @ParameterizedTest
+    @MethodSource("getProvider")
+    void testGet(Integer[] initialKeys, String[] initialValues, Integer key, String expectedValue, List<String> expectedTrace) {
+        seed(initialKeys, initialValues);
+        String result = map.get(key);
+        assertEquals(expectedValue, result);
+        assertEquals(expectedTrace, map.getTrace());
     }
 
-    @ParameterizedTest(name = "contains key={1}, expected={2}, initial={0}")
-    @MethodSource("containsCases")
-    void testContains_ExecutionPath(int[] initialKeys, int searchKey, boolean expectedResult, List<String> expectedTrace) {
-        seed(initialKeys);
-        hashTable.clearTrace();
-
-        boolean result = hashTable.contains(searchKey);
-
-        assertEquals(expectedResult, result);
-        assertEquals(expectedTrace, hashTable.getTrace());
+    static Stream<Arguments> removeProvider() {
+        return Stream.of(
+                Arguments.of(new Integer[]{10, 20}, new String[]{"V1", "V2"}, 20, List.of("REMOVE_START", "CALC_HASH", "ITERATE_CHAIN", "REMOVE_FOUND", "REMOVE_HEAD")),
+                Arguments.of(new Integer[]{10, 20}, new String[]{"V1", "V2"}, 10, List.of("REMOVE_START", "CALC_HASH", "ITERATE_CHAIN", "ITERATE_CHAIN", "REMOVE_FOUND", "REMOVE_INNER")),
+                Arguments.of(new Integer[]{10}, new String[]{"V1"}, 15, List.of("REMOVE_START", "CALC_HASH", "REMOVE_NOT_FOUND")),
+                Arguments.of(new Integer[]{10}, new String[]{"V1"}, 20, List.of("REMOVE_START", "CALC_HASH", "ITERATE_CHAIN", "REMOVE_NOT_FOUND"))
+        );
     }
 
-    @Test
-    public void testPut_WithCollision_ExecutionPath() {
-        hashTable.put(5);
-        hashTable.clearTrace();
-
-        hashTable.put(15);
-
-        List<String> expectedTrace = Arrays.asList(
-                "PUT_START", "CALC_HASH", "ITERATE_CHAIN", "INSERT_NEW"
-        );
-        assertEquals(expectedTrace, hashTable.getTrace());
-    }
-
-    @Test
-    public void testPut_DuplicateKey_ExecutionPath() {
-        hashTable.put(25);
-        hashTable.clearTrace();
-
-        hashTable.put(25);
-
-        List<String> expectedTrace = Arrays.asList(
-                "PUT_START", "CALC_HASH", "ITERATE_CHAIN", "FOUND_DUPLICATE"
-        );
-        assertEquals(expectedTrace, hashTable.getTrace());
-    }
-
-    @Test
-    public void testContains_KeyFound_ExecutionPath() {
-        hashTable.put(13);
-        hashTable.put(23);
-        hashTable.put(33);
-        hashTable.clearTrace();
-
-        boolean result = hashTable.contains(13);
-
-        List<String> expectedTrace = Arrays.asList(
-                "SEARCH_START",
-                "CALC_HASH",
-                "ITERATE_CHAIN",
-                "ITERATE_CHAIN",
-                "ITERATE_CHAIN",
-                "FOUND_TRUE"
-        );
-
-        assertTrue(result);
-        assertEquals(expectedTrace, hashTable.getTrace());
-    }
-
-    @Test
-    public void testRemove_RemoveHead_ExecutionPath() {
-        hashTable.put(10);
-        hashTable.put(20);
-        hashTable.clearTrace();
-
-        hashTable.remove(20);
-
-        List<String> expectedTrace = Arrays.asList(
-                "REMOVE_START",
-                "CALC_HASH",
-                "ITERATE_CHAIN",
-                "REMOVE_FOUND",
-                "REMOVE_HEAD"
-        );
-
-        assertEquals(expectedTrace, hashTable.getTrace());
-    }
-
-    @Test
-    public void testRemove_RemoveInner_ExecutionPath() {
-        hashTable.put(10);
-        hashTable.put(20);
-        hashTable.put(30);
-        hashTable.clearTrace();
-
-        hashTable.remove(20);
-
-        List<String> expectedTrace = Arrays.asList(
-                "REMOVE_START",
-                "CALC_HASH",
-                "ITERATE_CHAIN",
-                "ITERATE_CHAIN",
-                "REMOVE_FOUND",
-                "REMOVE_INNER"
-        );
-
-        assertEquals(expectedTrace, hashTable.getTrace());
-    }
-
-    @Test
-    public void testRemove_NotFound_ExecutionPath() {
-        hashTable.put(2);
-        hashTable.clearTrace();
-
-        hashTable.remove(42);
-
-        List<String> expectedTrace = Arrays.asList(
-                "REMOVE_START",
-                "CALC_HASH",
-                "ITERATE_CHAIN",
-                "REMOVE_NOT_FOUND"
-        );
-
-        assertEquals(expectedTrace, hashTable.getTrace());
-    }
-    @Test
-    public void testContains_KeyNotFound_ExecutionPath() {
-        hashTable.put(5);
-        hashTable.put(15);
-        hashTable.clearTrace();
-
-        boolean result = hashTable.contains(25);
-
-        List<String> expectedTrace = Arrays.asList(
-                "SEARCH_START",
-                "CALC_HASH",
-                "ITERATE_CHAIN",
-                "ITERATE_CHAIN",
-                "FOUND_FALSE"
-        );
-
-        assertFalse(result);
-        assertEquals(expectedTrace, hashTable.getTrace());
-    }
-
-    @Test
-    public void testNegativeKey_EquivalenceClass_ExecutionPath() {
-        hashTable.clearTrace();
-
-        hashTable.put(-15);
-
-        List<String> expectedTrace = Arrays.asList(
-                "PUT_START", "CALC_HASH", "INSERT_NEW"
-        );
-        assertEquals(expectedTrace, hashTable.getTrace());
-        assertTrue(hashTable.contains(-15));
+    @ParameterizedTest
+    @MethodSource("removeProvider")
+    void testRemove(Integer[] initialKeys, String[] initialValues, Integer key, List<String> expectedTrace) {
+        seed(initialKeys, initialValues);
+        map.remove(key);
+        assertEquals(expectedTrace, map.getTrace());
     }
 }

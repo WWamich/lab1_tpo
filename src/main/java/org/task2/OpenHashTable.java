@@ -2,27 +2,30 @@ package org.task2;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
-public class OpenHashTable {
+public class OpenHashTable<K, V> {
 
-    private static class HashNode {
-        int key;
-        HashNode next;
+    private static class HashNode<K, V> {
+        K key;
+        V value;
+        HashNode<K, V> next;
 
-        public HashNode(int key) {
+        public HashNode(K key, V value) {
             this.key = key;
+            this.value = value;
             this.next = null;
         }
     }
 
     private int capacity;
-    private HashNode[] table;
-
+    private HashNode<K, V>[] table;
     private List<String> executionTrace;
 
+    @SuppressWarnings("unchecked")
     public OpenHashTable(int capacity) {
         this.capacity = capacity;
-        this.table = new HashNode[capacity];
+        this.table = (HashNode<K, V>[]) new HashNode[capacity];
         this.executionTrace = new ArrayList<>();
     }
 
@@ -38,60 +41,61 @@ public class OpenHashTable {
         executionTrace.clear();
     }
 
-    private int hashFunction(int key) {
-        return Math.abs(key) % capacity;
+    private int hashFunction(K key) {
+        return Math.abs(Objects.hashCode(key)) % capacity;
     }
 
-    public void put(int key) {
+    public void put(K key, V value) {
         record("PUT_START");
         int index = hashFunction(key);
         record("CALC_HASH");
 
-        HashNode current = table[index];
+        HashNode<K, V> current = table[index];
         while (current != null) {
             record("ITERATE_CHAIN");
-            if (current.key == key) {
-                record("FOUND_DUPLICATE");
+            if (Objects.equals(current.key, key)) {
+                current.value = value;
+                record("REPLACE_VALUE");
                 return;
             }
             current = current.next;
         }
 
         record("INSERT_NEW");
-        HashNode newNode = new HashNode(key);
+        HashNode<K, V> newNode = new HashNode<>(key, value);
         newNode.next = table[index];
         table[index] = newNode;
     }
 
-    public boolean contains(int key) {
-        record("SEARCH_START");
+    public V get(K key) {
+        record("GET_START");
         int index = hashFunction(key);
         record("CALC_HASH");
 
-        HashNode current = table[index];
+        HashNode<K, V> current = table[index];
         while (current != null) {
             record("ITERATE_CHAIN");
-            if (current.key == key) {
-                record("FOUND_TRUE");
-                return true;
+            if (Objects.equals(current.key, key)) {
+                record("FOUND_KEY");
+                return current.value;
             }
             current = current.next;
         }
-        record("FOUND_FALSE");
-        return false;
+        record("NOT_FOUND");
+        return null;
     }
 
-    public void remove(int key) {
+    public void remove(K key) {
         record("REMOVE_START");
         int index = hashFunction(key);
         record("CALC_HASH");
 
-        HashNode current = table[index];
-        HashNode prev = null;
+        HashNode<K, V> current = table[index];
+        HashNode<K, V> prev = null;
 
         while (current != null) {
             record("ITERATE_CHAIN");
-            if (current.key == key) {
+            if (Objects.equals(current.key, key)) {
                 record("REMOVE_FOUND");
                 if (prev == null) {
                     record("REMOVE_HEAD");
@@ -107,6 +111,4 @@ public class OpenHashTable {
         }
         record("REMOVE_NOT_FOUND");
     }
-
-
 }
